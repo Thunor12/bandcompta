@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static',filename='styles/index.css') }}"
+    />
+
+    <title>ToDo List</title>
+  </head>
+  <body>
+    <h1>ToDo List</h1>
+
+    <table>
+      <tr>
+        <th>name</th>
+        <th>company</th>
+        <th>type</th>
+        <th>executed</th>
+        <th>Date</th>
+        <th>price_full_tax</th>
+        <th>tag</th>
+        <th>tax_amount</th>
+        <th>invoice_path</th>
+        <th>delete</th>
+      </tr>
+
+      {% for task in tasks %}
+      <tr>
+        {% for cell in task[1:] %}
+        <td>{{ cell }}</td>
+        {% endfor %}
+
+        <td>
+          <form
+            method="get"
+            action="/delete/{{ task[0] }}"
+            onsubmit="return confirm('Are you sure?');"
+          >
+            <button class="delete-btn">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <h2>Add a Transaction</h2>
+    <form method="post" action="/add">
+      <input type="text" name="name" placeholder="Transaction name" required />
+
+      <input type="text" name="company" placeholder="Company" />
+
+      <select name="type">
+        <option value="INCOME">Income</option>
+        <option value="EXPENSE">Expense</option>
+        <option value="NDF">NDF</option>
+      </select>
+
+      <label>
+        <input type="checkbox" name="executed" />
+        Executed
+      </label>
+
+      <input
+        type="datetime-local"
+        name="date"
+        value="{{ current_time }}"
+        required
+      />
+
+      <input
+        type="number"
+        name="price_full_tax"
+        placeholder="Price (EUR)"
+        step="0.01"
+      />
+
+      <input type="text" name="tag" placeholder="Tag (e.g. Transport)" />
+
+      <input
+        type="number"
+        name="tax_amount"
+        placeholder="Tax (%)"
+        step="0.1"
+        value="20.0"
+      />
+
+      <input
+        type="text"
+        name="invoice_path"
+        placeholder="Invoice file path or URL"
+      />
+
+      <button type="submit">Add Transaction</button>
+    </form>
+
+    <div>Total {{total}} €</div>
+  </body>
+</html>
