@@ -1,48 +1,12 @@
-# bandcompta
+# React + Vite
 
-- [bandcompta](#bandcompta)
-  - [Archi](#archi)
-  - [Model de base de donnée](#model-de-base-de-donnée)
-    - [Transations](#transations)
-    - [Dépense](#dépense)
-    - [Recette](#recette)
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Archi
+Currently, two official plugins are available:
 
-![Archi](doc/img/archi.jpg)
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## Model de base de donnée
+## Expanding the ESLint configuration
 
-### Transations
-
-Une première approche est d'avoir une table par type de transaction.
-Nous pourrions aussi avoir une talbe pour toutes les transactions, mais la gestion des justificatifs de paiements peut être plus compliquée.
-
-L'ensemble de ces table nous permetterons de calculer la trésorie.
-Il suffit de faire la somme de tous les type de transaction:
-
-$
-Treso = sum(Recette) - sum(Dépense) - sum(Note de frais)
-$
-
-### Dépense
-
-| Id          | Name  | Company | Executed | Date | PriceFullTax | PaymentMethode                       | Tag                                       | TaxAmount | InvoicePath |
-| ----------- | ----- | ------- | -------- | ---- | ------------ | ------------------------------------ | ----------------------------------------- | --------- | ----------- |
-| (PrmaryKey) | (str) | (str)   | (bool)   | date | (€)          | (enum/str) (ex: Virement,CB,AuBlack) | (enum/str) (ex: Transport, Fourniture...) | (%)       | (path/str)  |
-
-Nous ajouterons une valeur à cette table à chaque fois que l'on recoît une facture.
-Le but étant d'avoir un sous ensemble qui permet de resigner la dépense en donnant le fichier.
-Ce fichier sera stocker sur un system de fichier géré par le serveur et son chemin sera sauvgardé dans la DB.
-
-Selon le PaymentMethode (surtout au black) il n'y aura pas de justificatif et cela nous permetteras de filtrer.
-
-### Recette
-
-
-| Id          | Name  | Company | Received | Date | PriceFullTax | PaymentMethode                       | Tag                                       | TaxAmount | InvoicePath |
-| ----------- | ----- | ------- | -------- | ---- | ------------ | ------------------------------------ | ----------------------------------------- | --------- | ----------- |
-| (PrmaryKey) | (str) | (str)   | (bool)   | date | (€)          | (enum/str) (ex: Virement,CB,AuBlack) | (enum/str) (ex: Transport, Fourniture...) | (%)       | (path/str)  |
-
-
-Les deux tables étant pareils, il est tout à fait faisable d'avoir un enum en plus pour savoir si c'est une dépense, une recette ou une note de frais.
+If you are developing a production application, we recommend using TypeScript and enable type-aware lint rules. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
