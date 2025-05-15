@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { initDB, getTransactions, deleteTransaction } from "./data/sqlite";
+import { initDB, getTransactions, deleteTransaction, addTransaction } from "./data/sqlite";
 import TransactionForm from "./components/TransactionForm";
 import TransactionTable from "./components/TransactionTable";
+import { transactionTemplate } from "./data/transactionModel";
 
 function App() {
   const [transactions, setTransactions] = useState([]);
@@ -11,12 +12,12 @@ function App() {
   };
 
   useEffect(() => {
-    initDB().then(() => {
-      fetchTransactions();
-    });
+    initDB();
+    fetchTransactions();
   }, []);
 
-  const addTransaction = () => {
+  const addTrans = (t) => {
+    addTransaction(t);
     fetchTransactions();
   };
 
@@ -28,8 +29,12 @@ function App() {
   return (
     <div className="container">
       <h1>Transaction Manager</h1>
-      <TransactionForm onAdd={addTransaction} />
+
+      <h2>Transaction List</h2>
       <TransactionTable transactions={transactions} onDelete={deleteTrans} />
+
+      <h2>Add Transaction</h2>
+      <TransactionForm onAdd={addTrans} />
     </div>
   );
 }

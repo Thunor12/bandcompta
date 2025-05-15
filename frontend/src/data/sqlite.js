@@ -1,9 +1,12 @@
 import initSqlJs from "sql.js";
 import fs from "fs";
+import { transactionTemplate } from "./transactionModel";
 
-let db = null;
+let db = [];
 
-const initDB = async () => {
+const initDB = () => {
+
+  /*
 
     const filebuffer = fs.readFileSync('test.db');
 
@@ -30,9 +33,15 @@ const initDB = async () => {
         invoice_path TEXT
       );
     `);
+
+    */
+   if (db.length === 0) {
+    db.push(transactionTemplate);
+   }
 };
 
 const addTransaction = (transaction) => {
+  /*
     const stmt = db.prepare(`
       INSERT INTO transactions (name, company, type, executed, date, price_full_tax, tag, tax_amount, invoice_path)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -49,9 +58,15 @@ const addTransaction = (transaction) => {
         transaction.invoice_path,
     ]);
     stmt.free();
+    */
+
+   console.log("Adding transcation: ", transaction);
+   db.push(transaction);
+   console.log("Resulting transcations: ", db);
 };
 
 const getTransactions = () => {
+  /*
     const stmt = db.prepare("SELECT * FROM transactions");
     const result = [];
     while (stmt.step()) {
@@ -59,12 +74,16 @@ const getTransactions = () => {
     }
     stmt.free();
     return result;
+    */
+   console.log("Getting transactions");
+   return Array.from(db);
 };
 
 const deleteTransaction = (id) => {
-    const stmt = db.prepare("DELETE FROM transactions WHERE id = ?");
-    stmt.run([id]);
-    stmt.free();
+    // const stmt = db.prepare("DELETE FROM transactions WHERE id = ?");
+    // stmt.run([id]);
+    // stmt.free();
+    console.log("ID to delete: ", id);
 };
 
 export { initDB, addTransaction, getTransactions, deleteTransaction };

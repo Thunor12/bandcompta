@@ -11,7 +11,7 @@ export default function TransactionTable({ transactions, onDelete }) {
             </thead>
             <tbody>
                 {transactions.map((t) => (
-                    <tr key={t.id}>
+                    <tr key={t.name}>
                         <td>{t.name}</td>
                         <td>{t.company}</td>
                         <td>{t.type}</td>
