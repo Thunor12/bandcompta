@@ -51,7 +51,7 @@ async fn get_transactions(
     })
     .await?;
 
-    let last_id = match transactions.iter().max_by(|a,b| a.id.cmp(&b.id)) {
+    let last_id = match transactions.iter().max_by(|a, b| a.id.cmp(&b.id)) {
         Some(m) => m.id,
         None => 0,
     };
@@ -104,7 +104,7 @@ async fn main() -> std::io::Result<()> {
 
     let transactions = Transaction::list(&mut conn);
 
-    let last_id = match transactions.iter().max_by(|a,b| a.id.cmp(&b.id)) {
+    let last_id = match transactions.iter().max_by(|a, b| a.id.cmp(&b.id)) {
         Some(m) => m.id,
         None => 0,
     };
@@ -113,7 +113,9 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Cors::permissive())
             .app_data(web::Data::new(pool.clone()))
-            .app_data(web::Data::new(Mutex::new(AppData{last_id: last_id + 1})))
+            .app_data(web::Data::new(Mutex::new(AppData {
+                last_id: last_id,
+            })))
             .service(get_transactions)
             .service(post_transactions)
             .service(hello)
