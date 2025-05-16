@@ -5,10 +5,10 @@ import TransactionTable from "./components/TransactionTable";
 import { transactionTemplate } from "./data/transactionModel";
 
 function App() {
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState(Array());
 
   const fetchTransactions = () => {
-    setTransactions(getTransactions());
+    getTransactions().then(re => setTransactions(re))
   };
 
   useEffect(() => {
@@ -17,8 +17,7 @@ function App() {
   }, []);
 
   const addTrans = (t) => {
-    addTransaction(t);
-    fetchTransactions();
+    addTransaction(t).then(_ => fetchTransactions());
   };
 
   const deleteTrans = (id) => {

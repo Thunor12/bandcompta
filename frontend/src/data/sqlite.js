@@ -1,89 +1,74 @@
-import initSqlJs from "sql.js";
-import fs from "fs";
+import axios from "axios";
+
 import { transactionTemplate } from "./transactionModel";
+
+// const Url = '127.0.0.1:8080/transactions/';
+
+const config_get = {
+  method: 'get',
+  maxBodyLength: Infinity,
+  url: 'http://127.0.0.1:8080/transactions',
+  responseType: 'json',
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    "Access-Control-Allow-Origin": "http://127.0.0.1:8080/transactions",
+    "Access-Control-Allow-Methods": "GET"
+  }
+};
+
+let config_post = {
+  method: 'post',
+  maxBodyLength: Infinity,
+  url: 'http://127.0.0.1:8080/transactions',
+  responseType: 'json',
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    "Access-Control-Allow-Origin": "http://127.0.0.1:8080/transactions",
+    "Access-Control-Allow-Methods": "POST"
+  },
+  data: {
+
+  }
+};
 
 let db = [];
 
 const initDB = () => {
 
-  /*
-
-    const filebuffer = fs.readFileSync('test.db');
-
-    // initSqlJs().then(SQL => {
-    //     console.log("DAAAAAAAAAAAAA")
-    //     db = new SQL.Database(filebuffer);
-    // });
-
-    const SQL = await initSqlJs();
-    db = new SQL.Database(filebuffer);
-
-    // Create table if not exists
-    db.run(`
-      CREATE TABLE IF NOT EXISTS transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        company TEXT,
-        type TEXT,
-        executed INTEGER,
-        date TEXT,
-        price_full_tax REAL,
-        tag TEXT,
-        tax_amount REAL,
-        invoice_path TEXT
-      );
-    `);
-
-    */
-   if (db.length === 0) {
+  if (db.length === 0) {
     db.push(transactionTemplate);
-   }
+  }
 };
 
-const addTransaction = (transaction) => {
-  /*
-    const stmt = db.prepare(`
-      INSERT INTO transactions (name, company, type, executed, date, price_full_tax, tag, tax_amount, invoice_path)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run([
-        transaction.name,
-        transaction.company,
-        transaction.type,
-        transaction.executed ? 1 : 0,
-        transaction.date,
-        transaction.price_full_tax,
-        transaction.tag,
-        transaction.tax_amount,
-        transaction.invoice_path,
-    ]);
-    stmt.free();
-    */
+const addTransaction = async (transaction) => {
 
-   console.log("Adding transcation: ", transaction);
-   db.push(transaction);
-   console.log("Resulting transcations: ", db);
+  console.log("Adding transcation: ", transaction);
+
+  // await axios.post('/user', transaction, config_post);
+
+  config_post.data = transaction;
+  await axios.request(config_post);
+
+  config_post.data = {};
 };
 
-const getTransactions = () => {
-  /*
-    const stmt = db.prepare("SELECT * FROM transactions");
-    const result = [];
-    while (stmt.step()) {
-        result.push(stmt.getAsObject());
-    }
-    stmt.free();
-    return result;
-    */
-   console.log("Getting transactions");
-   return Array.from(db);
+const getTransactions = async () => {
+  let tab = [];
+
+  let response = await axios.request(config_get);
+
+  response.data.forEach(rt => {
+    tab.push(rt);
+  });
+
+  return tab;
 };
 
 const deleteTransaction = (id) => {
-    // const stmt = db.prepare("DELETE FROM transactions WHERE id = ?");
-    // stmt.run([id]);
-    // stmt.free();
-    console.log("ID to delete: ", id);
+
+  console.log("ID to delete: ", id);
 };
 
 export { initDB, addTransaction, getTransactions, deleteTransaction };

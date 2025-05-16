@@ -20,6 +20,9 @@ export const TRANSACTION_TYPE = [
     },
 ];
 
+export const transaction_label_from_value = (transaction_type_value) => {
+    return TRANSACTION_TYPE.find(t => t.value === transaction_type_value).label;
+}
 
 export const transactionTemplate = {
     id: 0,
