@@ -4,6 +4,8 @@ extern crate diesel;
 extern crate diesel_migrations;
 mod db;
 
+use actix_cors::Cors;
+
 use core::fmt;
 use std::sync::Mutex;
 
@@ -109,6 +111,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(Cors::permissive())
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(Mutex::new(AppData{last_id: last_id + 1})))
             .service(get_transactions)
