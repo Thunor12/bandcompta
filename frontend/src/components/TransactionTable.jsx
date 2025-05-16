@@ -21,7 +21,7 @@ export default function TransactionTable({ transactions, onDelete }) {
                         <td>{t.tag}</td>
                         <td>{t.tax_amount} %</td>
                         <td>{t.invoice_path}</td>
-                        <td><button onClick={() => onDelete(t.id)}>Delete</button></td>
+                        <td><button onClick={() => onDelete(t)}>Delete</button></td>
                     </tr>
                 ))}
             </tbody>

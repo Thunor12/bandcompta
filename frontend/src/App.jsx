@@ -1,28 +1,36 @@
 import { useState, useEffect } from "react";
-import { initDB, getTransactions, deleteTransaction, addTransaction } from "./data/sqlite";
+import { getTransactions, deleteTransaction, addTransaction } from "./data/sqlite";
 import TransactionForm from "./components/TransactionForm";
 import TransactionTable from "./components/TransactionTable";
-import { transactionTemplate } from "./data/transactionModel";
 
 function App() {
   const [transactions, setTransactions] = useState(Array());
 
   const fetchTransactions = () => {
-    getTransactions().then(re => setTransactions(re))
+    getTransactions().then(
+      tr => {
+        let trr = transactions;
+        trr = tr;
+        setTransactions(trr);
+      }
+    )
   };
 
   useEffect(() => {
-    initDB();
     fetchTransactions();
   }, []);
 
   const addTrans = (t) => {
-    addTransaction(t).then(_ => fetchTransactions());
+    addTransaction(t).then(() => {
+      fetchTransactions();
+    });
   };
 
-  const deleteTrans = (id) => {
-    deleteTransaction(id);
-    fetchTransactions();
+  const deleteTrans = (tr) => {
+    deleteTransaction(tr).then(() => {
+      fetchTransactions();
+    }
+    );
   };
 
   return (

@@ -2,8 +2,6 @@ import axios from "axios";
 
 import { transactionTemplate } from "./transactionModel";
 
-// const Url = '127.0.0.1:8080/transactions/';
-
 const config_get = {
   method: 'get',
   maxBodyLength: Infinity,
@@ -33,25 +31,20 @@ let config_post = {
   }
 };
 
-let db = [];
+let config_delete = {
+  method: 'delete',
+  maxBodyLength: Infinity,
+  url: 'http://127.0.0.1:8080/transactions',
+  responseType: 'json',
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    "Access-Control-Allow-Origin": "http://127.0.0.1:8080/transactions",
+    "Access-Control-Allow-Methods": "DELETE"
+  },
+  data: {
 
-const initDB = () => {
-
-  if (db.length === 0) {
-    db.push(transactionTemplate);
   }
-};
-
-const addTransaction = async (transaction) => {
-
-  console.log("Adding transcation: ", transaction);
-
-  // await axios.post('/user', transaction, config_post);
-
-  config_post.data = transaction;
-  await axios.request(config_post);
-
-  config_post.data = {};
 };
 
 const getTransactions = async () => {
@@ -66,9 +59,27 @@ const getTransactions = async () => {
   return tab;
 };
 
-const deleteTransaction = (id) => {
+const initDB = async () => {
+  await getTransactions();
+};
 
-  console.log("ID to delete: ", id);
+const addTransaction = async (transaction) => {
+
+  console.log("Adding transcation: ", transaction);
+
+  config_post.data = transaction;
+  await axios.request(config_post);
+
+  config_post.data = {};
+};
+
+const deleteTransaction = async (tr) => {
+  console.log("Transaction to delete: ", tr);
+
+  config_delete.data = tr;
+  await axios.request(config_delete);
+
+  config_delete.data = {};
 };
 
 export { initDB, addTransaction, getTransactions, deleteTransaction };

@@ -24,7 +24,7 @@ use db::{
 use diesel_migrations::EmbeddedMigrations;
 use diesel_migrations::{MigrationHarness, embed_migrations};
 
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, post, web};
+use actix_web::{App, HttpResponse, HttpServer, Responder, delete, get, post, web};
 struct AppData {
     last_id: i32,
 }
@@ -35,9 +35,31 @@ impl AppData {
     }
 }
 
-#[get("/")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
+#[delete("/transactions")]
+async fn delete_transaction(
+    pool: web::Data<DbPool>,
+    json: web::Json<Transaction>,
+) -> actix_web::Result<impl Responder> {
+    let tra = json.0;
+
+    let mut conn = match pool.get() {
+        Ok(c) => c,
+        Err(e) => return Ok(HttpResponse::InternalServerError().body(e.to_string())),
+    };
+
+    let disp_tra = tra.clone();
+
+    match Transaction::remove_by_id(&tra.id, &mut conn) {
+        Some(_) => Ok(HttpResponse::Ok().body(format!(
+            "Deleted transaction: {:?} {:?} {:?}!",
+            disp_tra.name, disp_tra.company, disp_tra.price_full_tax,
+        ))),
+
+        None => Ok(HttpResponse::Ok().body(format!(
+            "Transaction not in db: {:?} {:?} {:?}!",
+            disp_tra.name, disp_tra.company, disp_tra.price_full_tax,
+        ))),
+    }
 }
 
 #[get("/transactions")]
@@ -125,12 +147,10 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Cors::permissive())
             .app_data(web::Data::new(pool.clone()))
-            .app_data(web::Data::new(Mutex::new(AppData {
-                last_id: last_id,
-            })))
+            .app_data(web::Data::new(Mutex::new(AppData { last_id: last_id })))
             .service(get_transactions)
             .service(post_transactions)
-            .service(hello)
+            .service(delete_transaction)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
