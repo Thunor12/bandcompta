@@ -15,11 +15,16 @@ use actix_web::{
     http::StatusCode,
 };
 
-use db::{get_connection_pool, models::Transaction, schema::transactions::id, DbPool};
+use db::{
+    DbPool, MIGRATIONS, get_connection_pool,
+    models::Transaction,
+    schema::transactions::{self, id},
+};
+
+use diesel_migrations::EmbeddedMigrations;
+use diesel_migrations::{MigrationHarness, embed_migrations};
 
 use actix_web::{App, HttpResponse, HttpServer, Responder, get, post, web};
-use diesel::expression::is_aggregate::No;
-
 struct AppData {
     last_id: i32,
 }
@@ -100,7 +105,14 @@ async fn post_transactions(
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let pool = get_connection_pool("transactions.db");
-    let mut conn = pool.clone().get().expect("couldn't get db connection from pool");
+    let mut conn = pool
+        .clone()
+        .get()
+        .expect("couldn't get db connection from pool");
+
+    for m in conn.pending_migrations(MIGRATIONS).unwrap() {
+        let _ = m.run(&mut conn);
+    }
 
     let transactions = Transaction::list(&mut conn);
 
