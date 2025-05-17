@@ -9,6 +9,7 @@ function App() {
   const fetchTransactions = () => {
     getTransactions().then(
       tr => {
+        // Looks like we need to have transactions and setTransactions in the same scope to make the update work
         let trr = transactions;
         trr = tr;
         setTransactions(trr);
