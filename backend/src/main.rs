@@ -87,16 +87,20 @@ async fn get_transactions(
     app_data: web::Data<Mutex<AppData>>,
     pool: web::Data<DbPool>,
 ) -> actix_web::Result<impl Responder> {
-    // TODO handle error better
-
-    let transactions = web::block(move || {
+    let transactions: Result<Vec<Transaction>, BandComptaError> = web::block(move || {
         // Obtaining a connection from the pool is also a potentially blocking operation.
         // So, it should be called within the `web::block` closure, as well.
-        let mut conn = pool.get().expect("couldn't get db connection from pool");
 
-        Transaction::list(&mut conn)
+        let mut conn = pool.get()?;
+
+        Ok(Transaction::list(&mut conn))
     })
     .await?;
+
+    let transactions = match transactions {
+        Ok(t) => t,
+        Err(e) => return Ok(HttpResponse::InternalServerError().body(e.to_string())),
+    };
 
     let last_id = match transactions.iter().max_by(|a, b| a.id.cmp(&b.id)) {
         Some(m) => m.id,
@@ -118,12 +122,6 @@ async fn post_transactions(
     json: web::Json<Transaction>,
 ) -> actix_web::Result<impl Responder> {
     let mut tra = json.0;
-
-    let mut conn = match pool.get() {
-        Ok(c) => c,
-        Err(e) => return Ok(HttpResponse::InternalServerError().body(e.to_string())),
-    };
-
     tra.id = match app_data.lock() {
         Ok(c) => c.last_id + 1,
         Err(e) => return Ok(HttpResponse::InternalServerError().body(e.to_string())),
@@ -131,7 +129,17 @@ async fn post_transactions(
 
     let next_id = tra.id;
     let disp_tra = tra.clone();
-    Transaction::insert(tra, &mut conn);
+
+    let r: Result<(), BandComptaError> = web::block(move || {
+        let mut conn = pool.get()?;
+        Transaction::insert(tra, &mut conn);
+        Ok(())
+    })
+    .await?;
+
+    if let Some(e) = r.err() {
+        return Ok(HttpResponse::InternalServerError().body(e.to_string()));
+    }
 
     match app_data.lock() {
         Ok(mut c) => c.last_id = next_id,
@@ -139,7 +147,7 @@ async fn post_transactions(
     };
 
     Ok(HttpResponse::Ok().body(format!(
-        "Tra {:?} {:?} {:?}!",
+        "Adding Transanction: {:?} {:?} {:?}",
         disp_tra.name, disp_tra.company, disp_tra.price_full_tax,
     )))
 }
