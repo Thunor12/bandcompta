@@ -4,7 +4,15 @@ extern crate diesel;
 extern crate diesel_migrations;
 mod db;
 
+use thiserror::Error;
+
+use diesel::{Connection, SqliteConnection};
+use dotenv::dotenv;
+use env::VarError;
+
 use actix_cors::Cors;
+use r2d2::PooledConnection;
+use serde::de::Error;
 
 use core::fmt;
 use std::sync::Mutex;
@@ -12,7 +20,7 @@ use std::sync::Mutex;
 use actix_web::{
     body::MessageBody,
     error::{self, InternalError},
-    http::StatusCode,
+    http::{StatusCode, header::LastModified},
 };
 
 use db::{
@@ -20,6 +28,18 @@ use db::{
     models::Transaction,
     schema::transactions::{self, id},
 };
+
+#[derive(Error, Debug)]
+enum BandComptaError {
+    #[error("Failed to load env")]
+    EnvError(#[from] VarError),
+
+    #[error("Failed communicate with db")]
+    DataBaseError(#[from] r2d2::Error),
+
+    #[error("unknown error")]
+    Other(String),
+}
 
 use diesel_migrations::EmbeddedMigrations;
 use diesel_migrations::{MigrationHarness, embed_migrations};
