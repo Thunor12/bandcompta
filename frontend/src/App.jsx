@@ -39,10 +39,19 @@ function App() {
       <h1>Transaction Manager</h1>
 
       <h2>Transaction List</h2>
-      <TransactionTable transactions={transactions} onDelete={deleteTrans} />
+      <div className="card">
+        <TransactionTable transactions={transactions} onDelete={deleteTrans} />
+      </div>
 
       <h2>Add Transaction</h2>
-      <TransactionForm onAdd={addTrans} />
+      <div className="card">
+        <TransactionForm onAdd={addTrans} />
+      </div>
+
+      <footer>
+        © {new Date().getFullYear()} MyApp. All rights reserved.
+      </footer>
+
     </div>
   );
 }
