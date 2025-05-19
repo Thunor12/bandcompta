@@ -108,7 +108,7 @@ async fn get_transactions(
     };
 
     match app_data.lock() {
-        Ok(mut c) => c.last_id = last_id + 1,
+        Ok(mut c) => c.last_id = last_id,
         Err(e) => return Ok(HttpResponse::InternalServerError().body(e.to_string())),
     };
 
@@ -142,7 +142,7 @@ async fn post_transactions(
     }
 
     match app_data.lock() {
-        Ok(mut c) => c.last_id = next_id,
+        Ok(mut c) => c.last_id = next_id + 1,
         Err(e) => return Ok(HttpResponse::InternalServerError().body(e.to_string())),
     };
 
