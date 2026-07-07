@@ -6,5 +6,6 @@ edition = "2024"
 [dependencies]
 bandcompta-shared = { path = "../shared" }
 yew = { version = "0.21.0", features = ["csr"] }
+yew-router = "0.18.0"
 wasm-bindgen-futures = "0.4.50"
-web-sys = { version = "0.3.77", features = ["HtmlInputElement"] }
+web-sys = { version = "0.3.77", features = ["HtmlInputElement", "HtmlSelectElement", "FormData", "File", "FileList"] }

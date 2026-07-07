@@ -1,17 +1,18 @@
 use std::sync::{Arc, Mutex};
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
-use bandcompta_shared::{paths, DateFilter, Transaction, TreasurySummary};
+use bandcompta_shared::{paths, DateFilter, NewTransaction, Transaction, TreasurySummary, UploadResponse};
 use rusqlite::Connection;
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::db::{get_transaction, list_transactions, treasury_summary};
+use crate::db::{get_transaction, insert_transaction, list_transactions, treasury_summary};
+use crate::invoices::save_invoice;
 
 type DbState = Arc<Mutex<Connection>>;
 
@@ -22,9 +23,10 @@ pub fn app(connection: Connection) -> Router {
         .allow_headers(Any);
 
     Router::new()
-        .route(paths::TRANSACTIONS, get(list_handler))
+        .route(paths::TRANSACTIONS, get(list_handler).post(create_handler))
         .route(paths::TRANSACTIONS_BY_ID, get(get_handler))
         .route(paths::SUMMARY, get(summary_handler))
+        .route(paths::INVOICES_UPLOAD, post(upload_handler))
         .layer(cors)
         .with_state(Arc::new(Mutex::new(connection)))
 }
@@ -37,6 +39,19 @@ async fn list_handler(
     let connection = db.lock().map_err(|_| AppError::Internal)?;
     let transactions = list_transactions(&connection, &filter).map_err(AppError::Database)?;
     Ok(Json(transactions))
+}
+
+async fn create_handler(
+    State(db): State<DbState>,
+    Json(body): Json<NewTransaction>,
+) -> Result<(StatusCode, Json<Transaction>), AppError> {
+    body.validate().map_err(AppError::BadRequest)?;
+    let connection = db.lock().map_err(|_| AppError::Internal)?;
+    let id = insert_transaction(&connection, &body).map_err(AppError::Database)?;
+    let transaction = get_transaction(&connection, id)
+        .map_err(AppError::Database)?
+        .ok_or(AppError::Internal)?;
+    Ok((StatusCode::CREATED, Json(transaction)))
 }
 
 async fn get_handler(
@@ -58,6 +73,34 @@ async fn summary_handler(
     let connection = db.lock().map_err(|_| AppError::Internal)?;
     let transactions = list_transactions(&connection, &filter).map_err(AppError::Database)?;
     Ok(Json(treasury_summary(&transactions)))
+}
+
+async fn upload_handler(mut multipart: Multipart) -> Result<Json<UploadResponse>, AppError> {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|err| AppError::BadRequest(err.to_string()))?
+    {
+        if field.name() != Some("file") {
+            continue;
+        }
+
+        let filename = field
+            .file_name()
+            .map(str::to_string)
+            .unwrap_or_else(|| "upload.bin".to_string());
+        let data = field
+            .bytes()
+            .await
+            .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+        let response = save_invoice(&filename, &data)
+            .await
+            .map_err(AppError::BadRequest)?;
+        return Ok(Json(response));
+    }
+
+    Err(AppError::BadRequest("fichier manquant".into()))
 }
 
 enum AppError {

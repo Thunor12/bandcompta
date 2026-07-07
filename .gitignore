@@ -2,3 +2,5 @@ target
 dist
 Cargo.lock
 *.db
+backend/invoices/
+backend/test.db

@@ -8,6 +8,16 @@ pub enum TransactionType {
     Ndf,
 }
 
+impl TransactionType {
+    pub fn justification_label(&self) -> &'static str {
+        match self {
+            Self::Income => "Justificatif de recette",
+            Self::Expense => "Facture",
+            Self::Ndf => "Justificatif",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Transaction {
     pub id: i64,
@@ -35,6 +45,31 @@ pub struct NewTransaction {
     pub invoice_path: String,
 }
 
+impl NewTransaction {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.trim().is_empty() {
+            return Err("le nom est obligatoire".into());
+        }
+        if self.company.trim().is_empty() {
+            return Err("la société est obligatoire".into());
+        }
+        if self.date.len() != 10 {
+            return Err("la date doit être au format AAAA-MM-JJ".into());
+        }
+        if self.price_full_tax <= 0.0 {
+            return Err("le montant TTC doit être positif".into());
+        }
+        if self.tag.trim().is_empty() {
+            return Err("le tag est obligatoire".into());
+        }
+        Ok(())
+    }
+
+    pub fn has_justification(&self) -> bool {
+        !self.invoice_path.trim().is_empty()
+    }
+}
+
 impl From<NewTransaction> for Transaction {
     fn from(value: NewTransaction) -> Self {
         Self {
@@ -50,6 +85,11 @@ impl From<NewTransaction> for Transaction {
             invoice_path: value.invoice_path,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct UploadResponse {
+    pub path: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]

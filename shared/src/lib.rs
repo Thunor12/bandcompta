@@ -6,5 +6,5 @@ pub use api::{paths, summary_url, transaction_url, transactions_url, DEFAULT_API
 pub use api::ApiClient;
 pub use models::{
     compute_treasury_summary, DateFilter, NewTransaction, Transaction, TransactionType,
-    TreasurySummary,
+    TreasurySummary, UploadResponse,
 };

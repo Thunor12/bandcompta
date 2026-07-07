@@ -1,4 +1,5 @@
 mod db;
+mod invoices;
 mod routes;
 
 use std::net::SocketAddr;
@@ -10,6 +11,8 @@ const DB_PATH: &str = "test.db";
 
 #[tokio::main]
 async fn main() {
+    invoices::ensure_invoices_dir().expect("failed to create invoices directory");
+
     let connection = db::init_db(DB_PATH).expect("failed to initialize database");
     let app = routes::app(connection);
 
