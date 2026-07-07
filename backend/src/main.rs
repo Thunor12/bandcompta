@@ -2,6 +2,7 @@ mod contacts;
 mod db;
 mod invoices;
 mod routes;
+mod tags;
 
 use std::net::SocketAddr;
 

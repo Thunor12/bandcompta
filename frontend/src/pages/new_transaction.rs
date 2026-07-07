@@ -1,4 +1,4 @@
-use bandcompta_shared::{ApiClient, Contact, ContactFilter, NewTransaction, TransactionType};
+use bandcompta_shared::{ApiClient, Contact, ContactFilter, NewTag, NewTransaction, Tag, TransactionType};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
@@ -79,6 +79,8 @@ impl FormState {
 pub fn new_transaction_page() -> Html {
     let form = use_state(FormState::default);
     let contacts = use_state(LoadState::<Vec<Contact>>::default);
+    let tags = use_state(LoadState::<Vec<Tag>>::default);
+    let new_tag_name = use_state(String::new);
     let error = use_state(String::new);
     let success = use_state(String::new);
     let submitting = use_state(|| false);
@@ -86,6 +88,7 @@ pub fn new_transaction_page() -> Html {
 
     {
         let contacts = contacts.clone();
+        let tags = tags.clone();
         use_effect_with((), move |_| {
             spawn_local(async move {
                 match ApiClient::default_client().list_contacts(&ContactFilter::default()).await {
@@ -93,9 +96,68 @@ pub fn new_transaction_page() -> Html {
                     Err(err) => contacts.set(LoadState::Error(err)),
                 }
             });
+            spawn_local(async move {
+                match ApiClient::default_client().list_tags().await {
+                    Ok(data) => tags.set(LoadState::Ready(data)),
+                    Err(err) => tags.set(LoadState::Error(err)),
+                }
+            });
             || ()
         });
     }
+
+    let reload_tags = {
+        let tags = tags.clone();
+        Callback::from(move |_| {
+            tags.set(LoadState::Loading);
+            let tags = tags.clone();
+            spawn_local(async move {
+                match ApiClient::default_client().list_tags().await {
+                    Ok(data) => tags.set(LoadState::Ready(data)),
+                    Err(err) => tags.set(LoadState::Error(err)),
+                }
+            });
+        })
+    };
+
+    let on_add_tag = {
+        let new_tag_name = new_tag_name.clone();
+        let form = form.clone();
+        let error = error.clone();
+        let reload_tags = reload_tags.clone();
+        Callback::from(move |_| {
+            let name = (*new_tag_name).clone();
+            if name.trim().is_empty() {
+                return;
+            }
+            let error = error.clone();
+            let form = form.clone();
+            let new_tag_name = new_tag_name.clone();
+            let reload_tags = reload_tags.clone();
+            spawn_local(async move {
+                match ApiClient::default_client()
+                    .create_tag(&NewTag { name: name.clone() })
+                    .await
+                {
+                    Ok(tag) => {
+                        new_tag_name.set(String::new());
+                        form.set({
+                            let mut next = (*form).clone();
+                            next.tag = tag.name;
+                            next
+                        });
+                        reload_tags.emit(());
+                    }
+                    Err(err) => error.set(err),
+                }
+            });
+        })
+    };
+
+    let tag_list = match &*tags {
+        LoadState::Ready(list) => list.clone(),
+        _ => vec![],
+    };
 
     let filtered_contacts = match &*contacts {
         LoadState::Ready(list) => list
@@ -279,16 +341,32 @@ pub fn new_transaction_page() -> Html {
                     }} />
                 </label>
 
-                <label class="form-field">
+                <label class="form-field form-field-wide">
                     <span>{ "Tag" }</span>
-                    <input type="text" value={form.tag.clone()} required=true placeholder="Transport, Merch…" oninput={{
-                        let form = form.clone();
-                        Callback::from(move |e: InputEvent| {
-                            let mut next = (*form).clone();
-                            next.tag = input_value(&e);
-                            form.set(next);
-                        })
-                    }} />
+                    <select
+                        value={form.tag.clone()}
+                        required={!tag_list.is_empty()}
+                        onchange={{
+                            let form = form.clone();
+                            Callback::from(move |e: Event| {
+                                let mut next = (*form).clone();
+                                next.tag = select_value(&e);
+                                form.set(next);
+                            })
+                        }}
+                    >
+                        <option value="" disabled=true selected={form.tag.is_empty()}>{ "— Choisir un tag —" }</option>
+                        { for tag_list.iter().map(|tag| html! {
+                            <option value={tag.name.clone()}>{ tag.name.clone() }</option>
+                        }) }
+                    </select>
+                    <div class="inline-add">
+                        <input type="text" placeholder="Nouveau tag…" value={(*new_tag_name).clone()} oninput={{
+                            let new_tag_name = new_tag_name.clone();
+                            Callback::from(move |e: InputEvent| new_tag_name.set(input_value(&e)))
+                        }} />
+                        <button type="button" class="button-secondary" onclick={on_add_tag.reform(|_| ())}>{ "Ajouter" }</button>
+                    </div>
                 </label>
 
                 <label class="form-field checkbox-field">

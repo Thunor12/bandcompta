@@ -26,6 +26,7 @@ pub fn init_db(path: &str) -> SqlResult<Connection> {
     let connection = Connection::open(path)?;
     connection.execute(SCHEMA, [])?;
     crate::contacts::init_contacts(&connection)?;
+    crate::tags::init_tags(&connection)?;
     seed_if_empty(&connection)?;
     Ok(connection)
 }
@@ -44,7 +45,7 @@ fn seed_if_empty(connection: &Connection) -> SqlResult<()> {
             executed: true,
             date: "2025-06-15".into(),
             price_full_tax: 2500.0,
-            tag: "Concert".into(),
+            tag: "Prestation Musicale".into(),
             tax_amount: 20.0,
             invoice_path: "/invoices/2025-06-festival.pdf".into(),
         },
@@ -66,7 +67,7 @@ fn seed_if_empty(connection: &Connection) -> SqlResult<()> {
             executed: false,
             date: "2025-06-20".into(),
             price_full_tax: 680.0,
-            tag: "Merch".into(),
+            tag: "Scénographie".into(),
             tax_amount: 20.0,
             invoice_path: "".into(),
         },
@@ -77,7 +78,7 @@ fn seed_if_empty(connection: &Connection) -> SqlResult<()> {
             executed: true,
             date: "2025-06-16".into(),
             price_full_tax: 85.50,
-            tag: "Restauration".into(),
+            tag: "Transport".into(),
             tax_amount: 10.0,
             invoice_path: "/invoices/2025-06-repas.jpg".into(),
         },

@@ -481,3 +481,26 @@ button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+.inline-add {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    width: 100%;
+    max-width: 480px;
+}
+
+.inline-add input[type="text"] {
+    min-width: 0;
+    flex: 1 1 140px;
+    width: auto;
+}
+
+.inline-add button {
+    min-width: unset;
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+}

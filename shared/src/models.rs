@@ -71,6 +71,35 @@ impl NewContact {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Tag {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NewTag {
+    pub name: String,
+}
+
+impl NewTag {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.trim().is_empty() {
+            return Err("le nom du tag est obligatoire".into());
+        }
+        Ok(())
+    }
+}
+
+pub const PREDEFINED_TAGS: &[&str] = &[
+    "Studio",
+    "Prestation Son",
+    "Prestation Lumière",
+    "Prestation Musicale",
+    "Transport",
+    "Scénographie",
+];
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContactFilter {
     pub kind: Option<ContactKind>,

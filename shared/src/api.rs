@@ -10,6 +10,7 @@ pub mod paths {
     pub const INVOICES_UPLOAD: &str = "/api/invoices/upload";
     pub const CONTACTS: &str = "/api/contacts";
     pub const CONTACTS_BY_ID: &str = "/api/contacts/{id}";
+    pub const TAGS: &str = "/api/tags";
 
     pub fn transaction(id: i64) -> String {
         format!("/api/transactions/{id}")
@@ -36,8 +37,13 @@ pub fn contacts_url(base: &str, filter: &crate::ContactFilter) -> String {
     format!("{}{}{}", base, paths::CONTACTS, filter.to_query_string())
 }
 
+#[allow(dead_code)]
+pub fn tags_url(base: &str) -> String {
+    format!("{}{}", base, paths::TAGS)
+}
+
 #[cfg(target_arch = "wasm32")]
-use crate::{Contact, ContactFilter, NewContact, NewTransaction, Transaction, TreasurySummary, UploadResponse};
+use crate::{Contact, ContactFilter, NewContact, NewTag, NewTransaction, Tag, Transaction, TreasurySummary, UploadResponse};
 
 #[cfg(target_arch = "wasm32")]
 pub struct ApiClient {
@@ -129,6 +135,29 @@ impl ApiClient {
         gloo_net::http::Request::post(&format!("{}{}", self.base_url, paths::CONTACTS))
             .header("Content-Type", "application/json")
             .json(contact)
+            .map_err(|err| err.to_string())?
+            .send()
+            .await
+            .map_err(|err| err.to_string())?
+            .json()
+            .await
+            .map_err(|err| err.to_string())
+    }
+
+    pub async fn list_tags(&self) -> Result<Vec<Tag>, String> {
+        gloo_net::http::Request::get(&tags_url(&self.base_url))
+            .send()
+            .await
+            .map_err(|err| err.to_string())?
+            .json()
+            .await
+            .map_err(|err| err.to_string())
+    }
+
+    pub async fn create_tag(&self, tag: &NewTag) -> Result<Tag, String> {
+        gloo_net::http::Request::post(&format!("{}{}", self.base_url, paths::TAGS))
+            .header("Content-Type", "application/json")
+            .json(tag)
             .map_err(|err| err.to_string())?
             .send()
             .await
