@@ -125,3 +125,155 @@ a {
 a:hover {
     text-decoration: underline;
 }
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.subtitle {
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.summary-card {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.summary-card.highlight {
+    border-color: var(--primary);
+}
+
+.summary-label {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.summary-value {
+    font-size: 1.35rem;
+    font-weight: 600;
+}
+
+.summary-value.income {
+    color: #4ade80;
+}
+
+.summary-value.expense {
+    color: #f87171;
+}
+
+.summary-value.ndf {
+    color: #fbbf24;
+}
+
+.explorer-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 960px) {
+    .explorer-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.table-panel,
+.details-panel {
+    background-color: var(--surface);
+    border-radius: var(--radius);
+    padding: 1rem;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.3);
+}
+
+.details-panel.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+}
+
+.details-panel h2 {
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+.details-panel dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.5rem 1rem;
+    margin: 0;
+}
+
+.details-panel dt {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.details-panel dd {
+    margin: 0;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-income {
+    background: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+}
+
+.badge-expense {
+    background: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+}
+
+.badge-ndf {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+}
+
+tr.selected-row {
+    background-color: rgba(127, 90, 240, 0.15);
+}
+
+tr {
+    cursor: pointer;
+}
+
+.muted {
+    color: var(--text-muted);
+}
+
+.error,
+.error-panel {
+    color: var(--error);
+}
+
+code {
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    word-break: break-all;
+}

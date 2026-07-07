@@ -1,54 +1,23 @@
-use chrono::prelude::*;
-use serde_derive::{Deserialize, Serialize};
-use serde_rusqlite::*;
+mod db;
+mod models;
+mod routes;
 
-type Date_t = DateTime<Utc>;
+use std::net::SocketAddr;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-enum TransactionType {
-    INCOME,
-    EXPENSE,
-    NDF,
-}
+use tokio::net::TcpListener;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-struct Transaction {
-    name: String,
-    company: String,
-    transaction_type: TransactionType,
-    executed: bool,
-    date: String,
-    price_full_tax: f32,
-    tag: String,
-    tax_amount: f32,
-    invoice_path: String,
-}
+const DB_PATH: &str = "test.db";
+const API_ADDR: &str = "127.0.0.1:3000";
 
-const TIME_FMT: &'static str = "%Y-%m-%d";
+#[tokio::main]
+async fn main() {
+    let connection = db::init_db(DB_PATH).expect("failed to initialize database");
+    let app = routes::app(connection);
 
-fn main() {
-    let connection = rusqlite::Connection::open("test.db").unwrap();
+    let addr: SocketAddr = API_ADDR.parse().expect("invalid listen address");
+    let listener = TcpListener::bind(addr).await.expect("failed to bind API server");
 
-    connection.execute("CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY, name TEXT UNIQUE, company TEXT, transaction_type INTEGER, executed INTEGER, date TEXT, price_full_tax REAL, tag TEXT, tax_amount REAL, invoice_path TEXT)", []).unwrap();
+    println!("bandcompta API listening on http://{addr}");
 
-    let row1 = Transaction {
-        name: "Test2".into(),
-        company: "Dummy".into(),
-        transaction_type: TransactionType::EXPENSE,
-        executed: false,
-        date: "2025-01-02".into(),
-        price_full_tax: 100.0,
-        tag: "Visuels".into(),
-        tax_amount: 20.0,
-        invoice_path: "./".into(),
-    };
-
-    // connection.execute("INSERT INTO transactions (id, name, company, transaction_type, executed, date, price_full_tax, tag, tax_amount, invoice_path) VALUES (:id, :name, :company, :transaction_type, :executed, :date, :price_full_tax, :tag, :tax_amount, :invoice_path)", to_params_named(&row1).unwrap().to_slice().as_slice()).unwrap();
-
-    let mut statement = connection.prepare("SELECT * FROM transactions").unwrap();
-    let mut res = from_rows::<Transaction>(statement.query([]).unwrap()).filter_map(|x| x.ok());
-
-    for r in res {
-        println!("{:?}", r);
-    }
+    axum::serve(listener, app).await.expect("server error");
 }
