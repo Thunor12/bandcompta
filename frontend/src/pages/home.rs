@@ -25,6 +25,11 @@ pub fn home() -> Html {
                     <h2>{ "Sociétés" }</h2>
                     <p>{ "Gérer clients et prestataires utilisés dans les transactions." }</p>
                 </Link<Route>>
+
+                <Link<Route> to={Route::Stock} classes="home-card">
+                    <h2>{ "Stock merch" }</h2>
+                    <p>{ "Suivre les produits, variantes et quantités disponibles." }</p>
+                </Link<Route>>
             </div>
         </section>
     }

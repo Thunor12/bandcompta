@@ -80,3 +80,15 @@ pub fn parse_transaction_type(value: &str) -> TransactionType {
         _ => TransactionType::Expense,
     }
 }
+
+pub fn parse_product_kind(value: &str) -> bandcompta_shared::ProductKind {
+    use bandcompta_shared::ProductKind;
+    match value {
+        "TSHIRT" => ProductKind::Tshirt,
+        "PATCH" => ProductKind::Patch,
+        "PIN" => ProductKind::Pin,
+        "PRINT" => ProductKind::Print,
+        "ALBUM" => ProductKind::Album,
+        _ => ProductKind::Tshirt,
+    }
+}

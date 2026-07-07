@@ -1,5 +1,6 @@
 mod contacts;
 mod db;
+mod inventory;
 mod invoices;
 mod routes;
 mod tags;

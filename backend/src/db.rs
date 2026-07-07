@@ -27,6 +27,7 @@ pub fn init_db(path: &str) -> SqlResult<Connection> {
     connection.execute(SCHEMA, [])?;
     crate::contacts::init_contacts(&connection)?;
     crate::tags::init_tags(&connection)?;
+    crate::inventory::init_inventory(&connection)?;
     seed_if_empty(&connection)?;
     Ok(connection)
 }

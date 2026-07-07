@@ -504,3 +504,62 @@ button:disabled {
     width: auto;
     white-space: nowrap;
 }
+
+.stock-layout {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .stock-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.stock-detail {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1rem;
+    border: 1px solid var(--border);
+}
+
+.stock-detail h2 {
+    margin-top: 0;
+    font-size: 1.25rem;
+}
+
+.form-section-title {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+tr.row-selected {
+    background: rgba(127, 90, 240, 0.12);
+    cursor: pointer;
+}
+
+tbody tr {
+    cursor: pointer;
+}
+
+.stock-adjust-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.stock-adjust-cell input[type="text"] {
+    min-width: 60px;
+    flex: 0 1 70px;
+}
+
+.stock-adjust-cell button {
+    min-width: unset;
+    flex: 0 0 auto;
+    padding: 0.4rem 0.75rem;
+}
