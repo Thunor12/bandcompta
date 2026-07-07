@@ -1,17 +1,17 @@
 use std::sync::{Arc, Mutex};
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
     Json, Router,
 };
+use bandcompta_shared::{paths, DateFilter, Transaction, TreasurySummary};
 use rusqlite::Connection;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::db::{get_transaction, list_transactions, treasury_summary};
-use crate::models::{Transaction, TreasurySummary};
 
 type DbState = Arc<Mutex<Connection>>;
 
@@ -22,16 +22,20 @@ pub fn app(connection: Connection) -> Router {
         .allow_headers(Any);
 
     Router::new()
-        .route("/api/transactions", get(list_handler))
-        .route("/api/transactions/{id}", get(get_handler))
-        .route("/api/summary", get(summary_handler))
+        .route(paths::TRANSACTIONS, get(list_handler))
+        .route(paths::TRANSACTIONS_BY_ID, get(get_handler))
+        .route(paths::SUMMARY, get(summary_handler))
         .layer(cors)
         .with_state(Arc::new(Mutex::new(connection)))
 }
 
-async fn list_handler(State(db): State<DbState>) -> Result<Json<Vec<Transaction>>, AppError> {
+async fn list_handler(
+    State(db): State<DbState>,
+    Query(filter): Query<DateFilter>,
+) -> Result<Json<Vec<Transaction>>, AppError> {
+    filter.validate().map_err(AppError::BadRequest)?;
     let connection = db.lock().map_err(|_| AppError::Internal)?;
-    let transactions = list_transactions(&connection).map_err(AppError::Database)?;
+    let transactions = list_transactions(&connection, &filter).map_err(AppError::Database)?;
     Ok(Json(transactions))
 }
 
@@ -46,15 +50,20 @@ async fn get_handler(
     Ok(Json(transaction))
 }
 
-async fn summary_handler(State(db): State<DbState>) -> Result<Json<TreasurySummary>, AppError> {
+async fn summary_handler(
+    State(db): State<DbState>,
+    Query(filter): Query<DateFilter>,
+) -> Result<Json<TreasurySummary>, AppError> {
+    filter.validate().map_err(AppError::BadRequest)?;
     let connection = db.lock().map_err(|_| AppError::Internal)?;
-    let transactions = list_transactions(&connection).map_err(AppError::Database)?;
+    let transactions = list_transactions(&connection, &filter).map_err(AppError::Database)?;
     Ok(Json(treasury_summary(&transactions)))
 }
 
 enum AppError {
     Database(rusqlite::Error),
     NotFound,
+    BadRequest(String),
     Internal,
 }
 
@@ -63,6 +72,7 @@ impl IntoResponse for AppError {
         match self {
             Self::Database(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
             Self::NotFound => (StatusCode::NOT_FOUND, "transaction not found").into_response(),
+            Self::BadRequest(message) => (StatusCode::BAD_REQUEST, message).into_response(),
             Self::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal error").into_response(),
         }
     }

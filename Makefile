@@ -9,7 +9,7 @@ serve:
 	$(TRUNK) serve --open
 
 backend:
-	cargo build --manifest-path backend/Cargo.toml
+	cargo build -p backend
 
 run-backend:
-	cargo run --manifest-path backend/Cargo.toml
+	cargo run -p backend

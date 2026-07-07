@@ -1,0 +1,10 @@
+[package]
+name = "bandcompta"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bandcompta-shared = { path = "../shared" }
+yew = { version = "0.21.0", features = ["csr"] }
+wasm-bindgen-futures = "0.4.50"
+web-sys = { version = "0.3.77", features = ["HtmlInputElement"] }

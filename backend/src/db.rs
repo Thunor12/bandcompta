@@ -1,7 +1,9 @@
 use rusqlite::{Connection, Error as RusqliteError, Result as SqlResult};
 use serde_rusqlite::{from_rows, to_params_named, Error as SerdeRusqliteError};
 
-use crate::models::{NewTransaction, Transaction, TransactionType, TreasurySummary};
+use bandcompta_shared::{
+    compute_treasury_summary, DateFilter, NewTransaction, Transaction, TransactionType,
+};
 
 fn map_serde_err(err: SerdeRusqliteError) -> RusqliteError {
     RusqliteError::ToSqlConversionFailure(Box::new(err))
@@ -98,13 +100,33 @@ fn seed_if_empty(connection: &Connection) -> SqlResult<()> {
     Ok(())
 }
 
-pub fn list_transactions(connection: &Connection) -> SqlResult<Vec<Transaction>> {
-    let mut statement = connection.prepare(
+pub fn list_transactions(connection: &Connection, filter: &DateFilter) -> SqlResult<Vec<Transaction>> {
+    let from = filter.from.as_ref().filter(|value| !value.is_empty());
+    let to = filter.to.as_ref().filter(|value| !value.is_empty());
+
+    let mut sql = String::from(
         "SELECT id, name, company, transaction_type, executed, date, price_full_tax, tag, tax_amount, invoice_path
          FROM transactions
-         ORDER BY date DESC, id DESC",
-    )?;
-    Ok(from_rows::<Transaction>(statement.query([])?)
+         WHERE 1=1",
+    );
+
+    if from.is_some() {
+        sql.push_str(" AND date >= ?");
+    }
+    if to.is_some() {
+        sql.push_str(" AND date <= ?");
+    }
+    sql.push_str(" ORDER BY date DESC, id DESC");
+
+    let mut statement = connection.prepare(&sql)?;
+    let rows = match (from, to) {
+        (Some(from), Some(to)) => statement.query((from.as_str(), to.as_str()))?,
+        (Some(from), None) => statement.query([from.as_str()])?,
+        (None, Some(to)) => statement.query([to.as_str()])?,
+        (None, None) => statement.query([])?,
+    };
+
+    Ok(from_rows::<Transaction>(rows)
         .filter_map(|row| row.ok())
         .collect())
 }
@@ -132,24 +154,6 @@ pub fn insert_transaction(connection: &Connection, transaction: &NewTransaction)
     Ok(connection.last_insert_rowid())
 }
 
-pub fn treasury_summary(transactions: &[Transaction]) -> TreasurySummary {
-    let mut income_total = 0.0;
-    let mut expense_total = 0.0;
-    let mut ndf_total = 0.0;
-
-    for transaction in transactions {
-        match transaction.transaction_type {
-            TransactionType::Income => income_total += transaction.price_full_tax,
-            TransactionType::Expense => expense_total += transaction.price_full_tax,
-            TransactionType::Ndf => ndf_total += transaction.price_full_tax,
-        }
-    }
-
-    TreasurySummary {
-        income_total,
-        expense_total,
-        ndf_total,
-        balance: income_total - expense_total - ndf_total,
-        transaction_count: transactions.len(),
-    }
+pub fn treasury_summary(transactions: &[Transaction]) -> bandcompta_shared::TreasurySummary {
+    compute_treasury_summary(transactions)
 }

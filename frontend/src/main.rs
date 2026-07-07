@@ -1,19 +1,28 @@
-use gloo_net::http::Request;
-use serde::{Deserialize, Serialize};
+use bandcompta_shared::{ApiClient, DateFilter, Transaction, TransactionType, TreasurySummary};
 use wasm_bindgen_futures::spawn_local;
+use web_sys::wasm_bindgen::JsCast;
+use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
-const API_BASE: &str = "http://127.0.0.1:3000";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum TransactionType {
-    Income,
-    Expense,
-    Ndf,
+#[derive(Clone, PartialEq)]
+enum LoadState<T> {
+    Loading,
+    Ready(T),
+    Error(String),
 }
 
-impl TransactionType {
+impl<T> Default for LoadState<T> {
+    fn default() -> Self {
+        Self::Loading
+    }
+}
+
+trait TransactionTypeUi {
+    fn label(&self) -> &'static str;
+    fn css_class(&self) -> &'static str;
+}
+
+impl TransactionTypeUi for TransactionType {
     fn label(&self) -> &'static str {
         match self {
             Self::Income => "Recette",
@@ -31,64 +40,36 @@ impl TransactionType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct Transaction {
-    id: i64,
-    name: String,
-    company: String,
-    transaction_type: TransactionType,
-    executed: bool,
-    date: String,
-    price_full_tax: f32,
-    tag: String,
-    tax_amount: f32,
-    invoice_path: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-struct TreasurySummary {
-    income_total: f32,
-    expense_total: f32,
-    ndf_total: f32,
-    balance: f32,
-    transaction_count: usize,
-}
-
-#[derive(Clone, PartialEq)]
-enum LoadState<T> {
-    Loading,
-    Ready(T),
-    Error(String),
-}
-
-impl<T> Default for LoadState<T> {
-    fn default() -> Self {
-        Self::Loading
-    }
-}
-
 fn format_euro(value: f32) -> String {
     format!("{value:.2} €")
 }
 
-async fn fetch_transactions() -> Result<Vec<Transaction>, String> {
-    Request::get(&format!("{API_BASE}/api/transactions"))
-        .send()
-        .await
-        .map_err(|err| err.to_string())?
-        .json()
-        .await
-        .map_err(|err| err.to_string())
-}
+fn load_data(
+    filter: DateFilter,
+    transactions: UseStateHandle<LoadState<Vec<Transaction>>>,
+    summary: UseStateHandle<LoadState<TreasurySummary>>,
+) {
+    transactions.set(LoadState::Loading);
+    summary.set(LoadState::Loading);
 
-async fn fetch_summary() -> Result<TreasurySummary, String> {
-    Request::get(&format!("{API_BASE}/api/summary"))
-        .send()
-        .await
-        .map_err(|err| err.to_string())?
-        .json()
-        .await
-        .map_err(|err| err.to_string())
+    let transactions_for_list = transactions.clone();
+    let filter_for_list = filter.clone();
+    spawn_local(async move {
+        let client = ApiClient::default_client();
+        match client.list_transactions(&filter_for_list).await {
+            Ok(data) => transactions_for_list.set(LoadState::Ready(data)),
+            Err(err) => transactions_for_list.set(LoadState::Error(err)),
+        }
+    });
+
+    let summary_for_fetch = summary.clone();
+    spawn_local(async move {
+        let client = ApiClient::default_client();
+        match client.summary(&filter).await {
+            Ok(data) => summary_for_fetch.set(LoadState::Ready(data)),
+            Err(err) => summary_for_fetch.set(LoadState::Error(err)),
+        }
+    });
 }
 
 #[derive(Properties, PartialEq)]
@@ -116,6 +97,52 @@ fn summary_cards(SummaryCardsProps { summary }: &SummaryCardsProps) -> Html {
                 <span class="summary-label">{ "Trésorerie" }</span>
                 <span class="summary-value">{ format_euro(summary.balance) }</span>
             </div>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct DateFilterBarProps {
+    filter: DateFilter,
+    on_change: Callback<DateFilter>,
+    on_clear: Callback<()>,
+}
+
+#[function_component(DateFilterBar)]
+fn date_filter_bar(DateFilterBarProps { filter, on_change, on_clear }: &DateFilterBarProps) -> Html {
+    let on_from_change = {
+        let filter = filter.clone();
+        let on_change = on_change.clone();
+        Callback::from(move |e: Event| {
+            let input: HtmlInputElement = e.target().unwrap().dyn_into().unwrap();
+            let mut next = filter.clone();
+            next.set_from_input(&input.value());
+            on_change.emit(next);
+        })
+    };
+
+    let on_to_change = {
+        let filter = filter.clone();
+        let on_change = on_change.clone();
+        Callback::from(move |e: Event| {
+            let input: HtmlInputElement = e.target().unwrap().dyn_into().unwrap();
+            let mut next = filter.clone();
+            next.set_to_input(&input.value());
+            on_change.emit(next);
+        })
+    };
+
+    html! {
+        <div class="filter-bar">
+            <label class="filter-field">
+                <span>{ "Du" }</span>
+                <input type="date" value={filter.from.clone().unwrap_or_default()} onchange={on_from_change} />
+            </label>
+            <label class="filter-field">
+                <span>{ "Au" }</span>
+                <input type="date" value={filter.to.clone().unwrap_or_default()} onchange={on_to_change} />
+            </label>
+            <button type="button" class="button-secondary" onclick={on_clear.reform(|_| ())}>{ "Effacer" }</button>
         </div>
     }
 }
@@ -225,23 +252,14 @@ fn app() -> Html {
     let transactions = use_state(LoadState::<Vec<Transaction>>::default);
     let summary = use_state(LoadState::<TreasurySummary>::default);
     let selected_id = use_state(|| None::<i64>);
+    let date_filter = use_state(DateFilter::default);
 
     {
         let transactions = transactions.clone();
         let summary = summary.clone();
-        use_effect_with((), move |_| {
-            spawn_local(async move {
-                match fetch_transactions().await {
-                    Ok(data) => transactions.set(LoadState::Ready(data)),
-                    Err(err) => transactions.set(LoadState::Error(err)),
-                }
-            });
-            spawn_local(async move {
-                match fetch_summary().await {
-                    Ok(data) => summary.set(LoadState::Ready(data)),
-                    Err(err) => summary.set(LoadState::Error(err)),
-                }
-            });
+        let date_filter = (*date_filter).clone();
+        use_effect_with(date_filter, move |filter| {
+            load_data(filter.clone(), transactions, summary);
             || ()
         });
     }
@@ -249,25 +267,28 @@ fn app() -> Html {
     let on_refresh = {
         let transactions = transactions.clone();
         let summary = summary.clone();
+        let date_filter = (*date_filter).clone();
         Callback::from(move |_| {
-            transactions.set(LoadState::Loading);
-            summary.set(LoadState::Loading);
-
-            let transactions = transactions.clone();
-            let summary = summary.clone();
-            spawn_local(async move {
-                match fetch_transactions().await {
-                    Ok(data) => transactions.set(LoadState::Ready(data)),
-                    Err(err) => transactions.set(LoadState::Error(err)),
-                }
-            });
-            spawn_local(async move {
-                match fetch_summary().await {
-                    Ok(data) => summary.set(LoadState::Ready(data)),
-                    Err(err) => summary.set(LoadState::Error(err)),
-                }
-            });
+            load_data(
+                date_filter.clone(),
+                transactions.clone(),
+                summary.clone(),
+            )
         })
+    };
+
+    let on_filter_change = {
+        let date_filter = date_filter.clone();
+        let selected_id = selected_id.clone();
+        Callback::from(move |next: DateFilter| {
+            selected_id.set(None);
+            date_filter.set(next);
+        })
+    };
+
+    let on_filter_clear = {
+        let date_filter = date_filter.clone();
+        Callback::from(move |_| date_filter.set(DateFilter::default()))
     };
 
     let on_select = {
@@ -280,6 +301,8 @@ fn app() -> Html {
         _ => None,
     };
 
+    let active_filter_label = (*date_filter).active_label();
+
     html! {
         <>
             <header class="page-header">
@@ -289,6 +312,16 @@ fn app() -> Html {
                 </div>
                 <button onclick={on_refresh}>{ "Actualiser" }</button>
             </header>
+
+            <DateFilterBar
+                filter={(*date_filter).clone()}
+                on_change={on_filter_change}
+                on_clear={on_filter_clear}
+            />
+
+            if let Some(label) = active_filter_label {
+                <p class="filter-active">{ label }</p>
+            }
 
             { match &*summary {
                 LoadState::Ready(data) => html! { <SummaryCards summary={data.clone()} /> },
@@ -307,7 +340,7 @@ fn app() -> Html {
                             </div>
                         },
                         LoadState::Ready(items) if items.is_empty() => html! {
-                            <p class="muted">{ "Aucune transaction en base." }</p>
+                            <p class="muted">{ "Aucune transaction pour cette période." }</p>
                         },
                         LoadState::Ready(items) => html! {
                             <TransactionTable

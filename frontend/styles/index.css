@@ -42,6 +42,7 @@ form {
 }
 
 input[type="text"],
+input[type="date"],
 input[type="file"],
 button {
     padding: 0.6rem 1rem;
@@ -56,6 +57,7 @@ button {
 }
 
 input[type="text"]:focus,
+input[type="date"]:focus,
 input[type="file"]:focus {
     border-color: var(--primary);
     outline: none;
@@ -137,6 +139,52 @@ a:hover {
 .subtitle {
     color: var(--text-muted);
     margin: 0;
+}
+
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 1rem;
+    background-color: var(--surface);
+    padding: 1rem;
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.25);
+}
+
+.filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 180px;
+}
+
+.filter-field span {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.filter-field input[type="date"] {
+    min-width: 180px;
+    flex: unset;
+}
+
+.button-secondary {
+    background-color: var(--surface-hover);
+    border: 1px solid var(--border);
+    min-width: unset;
+    flex: unset;
+}
+
+.button-secondary:hover {
+    background-color: var(--border);
+}
+
+.filter-active {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0 0 1rem 0;
 }
 
 .summary-grid {
