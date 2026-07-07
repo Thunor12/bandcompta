@@ -8,6 +8,8 @@ pub mod paths {
     pub const TRANSACTIONS_BY_ID: &str = "/api/transactions/{id}";
     pub const SUMMARY: &str = "/api/summary";
     pub const INVOICES_UPLOAD: &str = "/api/invoices/upload";
+    pub const CONTACTS: &str = "/api/contacts";
+    pub const CONTACTS_BY_ID: &str = "/api/contacts/{id}";
 
     pub fn transaction(id: i64) -> String {
         format!("/api/transactions/{id}")
@@ -29,8 +31,13 @@ pub fn transaction_url(base: &str, id: i64) -> String {
     format!("{}{}", base, paths::transaction(id))
 }
 
+#[allow(dead_code)]
+pub fn contacts_url(base: &str, filter: &crate::ContactFilter) -> String {
+    format!("{}{}{}", base, paths::CONTACTS, filter.to_query_string())
+}
+
 #[cfg(target_arch = "wasm32")]
-use crate::{NewTransaction, Transaction, TreasurySummary, UploadResponse};
+use crate::{Contact, ContactFilter, NewContact, NewTransaction, Transaction, TreasurySummary, UploadResponse};
 
 #[cfg(target_arch = "wasm32")]
 pub struct ApiClient {
@@ -99,6 +106,29 @@ impl ApiClient {
 
         gloo_net::http::Request::post(&format!("{}{}", self.base_url, paths::INVOICES_UPLOAD))
             .body(form)
+            .map_err(|err| err.to_string())?
+            .send()
+            .await
+            .map_err(|err| err.to_string())?
+            .json()
+            .await
+            .map_err(|err| err.to_string())
+    }
+
+    pub async fn list_contacts(&self, filter: &ContactFilter) -> Result<Vec<Contact>, String> {
+        gloo_net::http::Request::get(&contacts_url(&self.base_url, filter))
+            .send()
+            .await
+            .map_err(|err| err.to_string())?
+            .json()
+            .await
+            .map_err(|err| err.to_string())
+    }
+
+    pub async fn create_contact(&self, contact: &NewContact) -> Result<Contact, String> {
+        gloo_net::http::Request::post(&format!("{}{}", self.base_url, paths::CONTACTS))
+            .header("Content-Type", "application/json")
+            .json(contact)
             .map_err(|err| err.to_string())?
             .send()
             .await

@@ -10,6 +10,7 @@ pub fn nav() -> Html {
             <Link<Route> to={Route::Home} classes="nav-link">{ "Accueil" }</Link<Route>>
             <Link<Route> to={Route::Explorer} classes="nav-link">{ "Explorateur" }</Link<Route>>
             <Link<Route> to={Route::NewTransaction} classes="nav-link">{ "Nouvelle transaction" }</Link<Route>>
+            <Link<Route> to={Route::Contacts} classes="nav-link">{ "Sociétés" }</Link<Route>>
         </nav>
     }
 }

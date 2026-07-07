@@ -20,6 +20,11 @@ pub fn home() -> Html {
                     <h2>{ "Nouvelle transaction" }</h2>
                     <p>{ "Saisir une recette, une dépense ou une note de frais avec son justificatif." }</p>
                 </Link<Route>>
+
+                <Link<Route> to={Route::Contacts} classes="home-card">
+                    <h2>{ "Sociétés" }</h2>
+                    <p>{ "Gérer clients et prestataires utilisés dans les transactions." }</p>
+                </Link<Route>>
             </div>
         </section>
     }

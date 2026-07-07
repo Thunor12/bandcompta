@@ -2,6 +2,8 @@ use bandcompta_shared::TransactionType;
 use web_sys::wasm_bindgen::JsCast;
 use web_sys::Event;
 
+use bandcompta_shared::ContactKind;
+
 pub fn format_euro(value: f32) -> String {
     format!("{value:.2} €")
 }
@@ -56,6 +58,19 @@ pub fn select_value(event: &Event) -> String {
         .and_then(|target| target.dyn_into::<web_sys::HtmlSelectElement>().ok())
         .map(|input| input.value())
         .unwrap_or_default()
+}
+
+pub fn parse_contact_kind(value: &str) -> ContactKind {
+    match value {
+        "CLIENT" => ContactKind::Client,
+        "PROVIDER" => ContactKind::Provider,
+        "BOTH" => ContactKind::Both,
+        _ => ContactKind::Provider,
+    }
+}
+
+pub fn contact_kind_matches(contact: &bandcompta_shared::Contact, kinds: &[ContactKind]) -> bool {
+    kinds.contains(&contact.kind) || contact.kind == ContactKind::Both
 }
 
 pub fn parse_transaction_type(value: &str) -> TransactionType {

@@ -1,3 +1,4 @@
+mod contacts;
 mod db;
 mod invoices;
 mod routes;

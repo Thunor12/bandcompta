@@ -16,6 +16,75 @@ impl TransactionType {
             Self::Ndf => "Justificatif",
         }
     }
+
+    pub fn preferred_contact_kinds(&self) -> &'static [ContactKind] {
+        match self {
+            Self::Income => &[ContactKind::Client, ContactKind::Both],
+            Self::Expense => &[ContactKind::Provider, ContactKind::Both],
+            Self::Ndf => &[ContactKind::Client, ContactKind::Provider, ContactKind::Both],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(i32)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ContactKind {
+    Client = 0,
+    Provider = 1,
+    Both = 2,
+}
+
+impl ContactKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Client => "Client",
+            Self::Provider => "Prestataire",
+            Self::Both => "Client & prestataire",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Contact {
+    pub id: i64,
+    pub name: String,
+    pub kind: ContactKind,
+    pub email: String,
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NewContact {
+    pub name: String,
+    pub kind: ContactKind,
+    pub email: String,
+    pub notes: String,
+}
+
+impl NewContact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.trim().is_empty() {
+            return Err("le nom de la société est obligatoire".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContactFilter {
+    pub kind: Option<ContactKind>,
+}
+
+impl ContactFilter {
+    pub fn to_query_string(&self) -> String {
+        match self.kind {
+            Some(ContactKind::Client) => "?kind=CLIENT".into(),
+            Some(ContactKind::Provider) => "?kind=PROVIDER".into(),
+            Some(ContactKind::Both) => "?kind=BOTH".into(),
+            None => String::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

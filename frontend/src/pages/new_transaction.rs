@@ -1,4 +1,4 @@
-use bandcompta_shared::{ApiClient, NewTransaction, TransactionType};
+use bandcompta_shared::{ApiClient, Contact, ContactFilter, NewTransaction, TransactionType};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
@@ -6,7 +6,7 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::components::ConfirmDialog;
-use crate::ui::{input_value, parse_transaction_type, select_value};
+use crate::ui::{contact_kind_matches, input_value, parse_transaction_type, select_value, LoadState};
 use crate::Route;
 
 #[derive(Clone, PartialEq)]
@@ -78,10 +78,33 @@ impl FormState {
 #[function_component(NewTransactionPage)]
 pub fn new_transaction_page() -> Html {
     let form = use_state(FormState::default);
+    let contacts = use_state(LoadState::<Vec<Contact>>::default);
     let error = use_state(String::new);
     let success = use_state(String::new);
     let submitting = use_state(|| false);
     let show_confirm = use_state(|| false);
+
+    {
+        let contacts = contacts.clone();
+        use_effect_with((), move |_| {
+            spawn_local(async move {
+                match ApiClient::default_client().list_contacts(&ContactFilter::default()).await {
+                    Ok(data) => contacts.set(LoadState::Ready(data)),
+                    Err(err) => contacts.set(LoadState::Error(err)),
+                }
+            });
+            || ()
+        });
+    }
+
+    let filtered_contacts = match &*contacts {
+        LoadState::Ready(list) => list
+            .iter()
+            .filter(|contact| contact_kind_matches(contact, form.transaction_type.preferred_contact_kinds()))
+            .cloned()
+            .collect::<Vec<_>>(),
+        _ => vec![],
+    };
 
     let justification_label = form.transaction_type.justification_label();
 
@@ -171,6 +194,7 @@ pub fn new_transaction_page() -> Html {
                             Callback::from(move |e: Event| {
                                 let mut next = (*form).clone();
                                 next.transaction_type = parse_transaction_type(&select_value(&e));
+                                next.company.clear();
                                 form.set(next);
                             })
                         }}
@@ -195,14 +219,28 @@ pub fn new_transaction_page() -> Html {
 
                 <label class="form-field">
                     <span>{ "Société" }</span>
-                    <input type="text" value={form.company.clone()} required=true oninput={{
-                        let form = form.clone();
-                        Callback::from(move |e: InputEvent| {
-                            let mut next = (*form).clone();
-                            next.company = input_value(&e);
-                            form.set(next);
-                        })
-                    }} />
+                    if filtered_contacts.is_empty() {
+                        <p class="muted">{ "Aucune société correspondante. " }
+                            <Link<Route> to={Route::Contacts}>{ "Ajouter une société" }</Link<Route>>
+                        </p>
+                    }
+                    <select
+                        value={form.company.clone()}
+                        required={!filtered_contacts.is_empty()}
+                        onchange={{
+                            let form = form.clone();
+                            Callback::from(move |e: Event| {
+                                let mut next = (*form).clone();
+                                next.company = select_value(&e);
+                                form.set(next);
+                            })
+                        }}
+                    >
+                        <option value="" disabled=true selected={form.company.is_empty()}>{ "— Choisir une société —" }</option>
+                        { for filtered_contacts.iter().map(|contact| html! {
+                            <option value={contact.name.clone()}>{ contact.name.clone() }</option>
+                        }) }
+                    </select>
                 </label>
 
                 <label class="form-field">

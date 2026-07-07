@@ -3,7 +3,7 @@ mod pages;
 mod ui;
 
 use components::Nav;
-use pages::{Explorer, Home, NewTransactionPage};
+use pages::{ContactsPage, Explorer, Home, NewTransactionPage};
 use yew::prelude::*;
 use yew_router::prelude::*;
 
@@ -15,6 +15,8 @@ pub enum Route {
     Explorer,
     #[at("/new")]
     NewTransaction,
+    #[at("/contacts")]
+    Contacts,
 }
 
 fn switch(routes: Route) -> Html {
@@ -22,6 +24,7 @@ fn switch(routes: Route) -> Html {
         Route::Home => html! { <Home /> },
         Route::Explorer => html! { <Explorer /> },
         Route::NewTransaction => html! { <NewTransactionPage /> },
+        Route::Contacts => html! { <ContactsPage /> },
     }
 }
 

@@ -5,7 +5,7 @@ use bandcompta_shared::{
     compute_treasury_summary, DateFilter, NewTransaction, Transaction, TransactionType,
 };
 
-fn map_serde_err(err: SerdeRusqliteError) -> RusqliteError {
+pub fn map_serde_err(err: SerdeRusqliteError) -> RusqliteError {
     RusqliteError::ToSqlConversionFailure(Box::new(err))
 }
 
@@ -25,6 +25,7 @@ const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS transactions (
 pub fn init_db(path: &str) -> SqlResult<Connection> {
     let connection = Connection::open(path)?;
     connection.execute(SCHEMA, [])?;
+    crate::contacts::init_contacts(&connection)?;
     seed_if_empty(&connection)?;
     Ok(connection)
 }

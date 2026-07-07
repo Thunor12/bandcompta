@@ -7,10 +7,11 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use bandcompta_shared::{paths, DateFilter, NewTransaction, Transaction, TreasurySummary, UploadResponse};
+use bandcompta_shared::{paths, ContactFilter, DateFilter, NewContact, NewTransaction, Transaction, TreasurySummary, UploadResponse};
 use rusqlite::Connection;
 use tower_http::cors::{Any, CorsLayer};
 
+use crate::contacts::{get_contact, insert_contact, list_contacts};
 use crate::db::{get_transaction, insert_transaction, list_transactions, treasury_summary};
 use crate::invoices::save_invoice;
 
@@ -27,8 +28,43 @@ pub fn app(connection: Connection) -> Router {
         .route(paths::TRANSACTIONS_BY_ID, get(get_handler))
         .route(paths::SUMMARY, get(summary_handler))
         .route(paths::INVOICES_UPLOAD, post(upload_handler))
+        .route(paths::CONTACTS, get(list_contacts_handler).post(create_contact_handler))
+        .route(paths::CONTACTS_BY_ID, get(get_contact_handler))
         .layer(cors)
         .with_state(Arc::new(Mutex::new(connection)))
+}
+
+async fn list_contacts_handler(
+    State(db): State<DbState>,
+    Query(filter): Query<ContactFilter>,
+) -> Result<Json<Vec<bandcompta_shared::Contact>>, AppError> {
+    let connection = db.lock().map_err(|_| AppError::Internal)?;
+    let contacts = list_contacts(&connection, &filter).map_err(AppError::Database)?;
+    Ok(Json(contacts))
+}
+
+async fn get_contact_handler(
+    State(db): State<DbState>,
+    Path(id): Path<i64>,
+) -> Result<Json<bandcompta_shared::Contact>, AppError> {
+    let connection = db.lock().map_err(|_| AppError::Internal)?;
+    let contact = get_contact(&connection, id)
+        .map_err(AppError::Database)?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(contact))
+}
+
+async fn create_contact_handler(
+    State(db): State<DbState>,
+    Json(body): Json<NewContact>,
+) -> Result<(StatusCode, Json<bandcompta_shared::Contact>), AppError> {
+    body.validate().map_err(AppError::BadRequest)?;
+    let connection = db.lock().map_err(|_| AppError::Internal)?;
+    let id = insert_contact(&connection, &body).map_err(AppError::Database)?;
+    let contact = get_contact(&connection, id)
+        .map_err(AppError::Database)?
+        .ok_or(AppError::Internal)?;
+    Ok((StatusCode::CREATED, Json(contact)))
 }
 
 async fn list_handler(
