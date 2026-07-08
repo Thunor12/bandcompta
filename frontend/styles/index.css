@@ -563,3 +563,72 @@ tbody tr {
     flex: 0 0 auto;
     padding: 0.4rem 0.75rem;
 }
+
+.alerts-panel {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.alerts-panel h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+    color: #f87171;
+}
+
+.alerts-list {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.alert-qty {
+    color: #f87171;
+    font-weight: 600;
+}
+
+.stock-movements-panel {
+    margin-top: 1.5rem;
+}
+
+.stock-movements-panel h2 {
+    margin-top: 0;
+}
+
+.row-low-stock {
+    background: rgba(239, 68, 68, 0.06);
+}
+
+.stock-sale-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    min-width: 280px;
+}
+
+.stock-sale-cell input[type="text"] {
+    min-width: 50px;
+    flex: 0 1 60px;
+}
+
+.stock-sale-cell input[type="date"] {
+    min-width: 120px;
+    flex: 0 1 auto;
+}
+
+.stock-sale-cell .btn-sale {
+    min-width: unset;
+    flex: 0 0 auto;
+    padding: 0.4rem 0.75rem;
+    background-color: #16a34a;
+}
+
+.delta-negative {
+    color: #f87171;
+}
+
+.delta-positive {
+    color: #4ade80;
+}

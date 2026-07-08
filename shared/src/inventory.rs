@@ -134,6 +134,145 @@ impl AdjustStock {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MovementType {
+    Sale,
+    Adjustment,
+    Restock,
+}
+
+impl MovementType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Sale => "Vente",
+            Self::Adjustment => "Ajustement",
+            Self::Restock => "Réappro",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StockMovement {
+    pub id: i64,
+    pub variant_id: i64,
+    pub quantity_delta: i32,
+    pub note: String,
+    pub created_at: String,
+    pub movement_type: MovementType,
+    pub transaction_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StockMovementDetail {
+    pub id: i64,
+    pub variant_id: i64,
+    pub product_id: i64,
+    pub product_name: String,
+    pub variant_label: String,
+    pub sku: String,
+    pub quantity_delta: i32,
+    pub note: String,
+    pub created_at: String,
+    pub movement_type: MovementType,
+    pub transaction_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StockMovementFilter {
+    pub variant_id: Option<i64>,
+    pub product_id: Option<i64>,
+    pub limit: Option<u32>,
+}
+
+impl StockMovementFilter {
+    pub fn to_query_string(&self) -> String {
+        let mut params = Vec::new();
+        if let Some(variant_id) = self.variant_id {
+            params.push(format!("variant_id={variant_id}"));
+        }
+        if let Some(product_id) = self.product_id {
+            params.push(format!("product_id={product_id}"));
+        }
+        if let Some(limit) = self.limit {
+            params.push(format!("limit={limit}"));
+        }
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params.join("&"))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MerchSale {
+    pub variant_id: i64,
+    pub quantity: i32,
+    pub date: String,
+    pub company: String,
+    pub unit_price: Option<f32>,
+    pub tax_amount: f32,
+    pub executed: bool,
+    pub invoice_path: String,
+    pub note: String,
+}
+
+impl MerchSale {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.quantity <= 0 {
+            return Err("la quantité vendue doit être positive".into());
+        }
+        if self.date.len() != 10 {
+            return Err("la date doit être au format AAAA-MM-JJ".into());
+        }
+        if self.company.trim().is_empty() {
+            return Err("la société / point de vente est obligatoire".into());
+        }
+        if let Some(price) = self.unit_price {
+            if price <= 0.0 {
+                return Err("le prix unitaire doit être positif".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MerchSaleResult {
+    pub transaction: crate::Transaction,
+    pub variant: ProductVariant,
+    pub movement: StockMovement,
+}
+
+pub const DEFAULT_LOW_STOCK_THRESHOLD: i32 = 5;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LowStockAlert {
+    pub variant_id: i64,
+    pub product_id: i64,
+    pub product_name: String,
+    pub variant_label: String,
+    pub sku: String,
+    pub stock_quantity: i32,
+    pub threshold: i32,
+    pub unit_price: f32,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LowStockFilter {
+    pub threshold: Option<i32>,
+}
+
+impl LowStockFilter {
+    pub fn to_query_string(&self) -> String {
+        match self.threshold {
+            Some(threshold) => format!("?threshold={threshold}"),
+            None => String::new(),
+        }
+    }
+}
+
 pub const SHIRT_SIZES: &[&str] = &["XS", "S", "M", "L", "XL", "2XL", "3XL"];
 pub const ALBUM_FORMATS: &[&str] = &["CD", "Cassette", "Vinyle"];
 

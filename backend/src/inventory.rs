@@ -2,11 +2,13 @@ use rusqlite::{Connection, OptionalExtension, Result as SqlResult};
 use serde_rusqlite::{from_rows, to_params_named};
 
 use bandcompta_shared::{
-    AdjustStock, NewProduct, NewProductVariant, Product, ProductDetail, ProductKind,
-    ProductSummary, ProductVariant, VariantAttribute, VariantOption,
+    AdjustStock, LowStockAlert, LowStockFilter, MerchSale, MerchSaleResult, MovementType,
+    NewProduct, NewProductVariant, NewTransaction, Product, ProductDetail, ProductKind,
+    ProductSummary, ProductVariant, StockMovement, StockMovementDetail, StockMovementFilter,
+    TransactionType, VariantAttribute, VariantOption, variant_label,
 };
 
-use crate::db::map_serde_err;
+use crate::db::{get_transaction, insert_transaction, map_serde_err};
 
 const PRODUCTS_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY,
@@ -21,6 +23,7 @@ const VARIANTS_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS product_variants (
     sku TEXT NOT NULL DEFAULT '',
     stock_quantity INTEGER NOT NULL DEFAULT 0,
     unit_price REAL NOT NULL DEFAULT 0,
+    low_stock_threshold INTEGER NOT NULL DEFAULT 5,
     FOREIGN KEY (product_id) REFERENCES products(id)
 )";
 
@@ -38,7 +41,10 @@ const MOVEMENTS_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS stock_movements (
     quantity_delta INTEGER NOT NULL,
     note TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
-    FOREIGN KEY (variant_id) REFERENCES product_variants(id)
+    movement_type TEXT NOT NULL DEFAULT 'ADJUSTMENT',
+    transaction_id INTEGER,
+    FOREIGN KEY (variant_id) REFERENCES product_variants(id),
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id)
 )";
 
 pub fn init_inventory(connection: &Connection) -> SqlResult<()> {
@@ -46,7 +52,24 @@ pub fn init_inventory(connection: &Connection) -> SqlResult<()> {
     connection.execute(VARIANTS_SCHEMA, [])?;
     connection.execute(ATTRIBUTES_SCHEMA, [])?;
     connection.execute(MOVEMENTS_SCHEMA, [])?;
+    migrate_inventory(connection)?;
     seed_inventory_if_empty(connection)?;
+    Ok(())
+}
+
+fn migrate_inventory(connection: &Connection) -> SqlResult<()> {
+    let _ = connection.execute(
+        "ALTER TABLE stock_movements ADD COLUMN movement_type TEXT NOT NULL DEFAULT 'ADJUSTMENT'",
+        [],
+    );
+    let _ = connection.execute(
+        "ALTER TABLE stock_movements ADD COLUMN transaction_id INTEGER REFERENCES transactions(id)",
+        [],
+    );
+    let _ = connection.execute(
+        "ALTER TABLE product_variants ADD COLUMN low_stock_threshold INTEGER NOT NULL DEFAULT 5",
+        [],
+    );
     Ok(())
 }
 
@@ -283,32 +306,262 @@ pub fn adjust_stock(
 ) -> SqlResult<Option<ProductVariant>> {
     adjustment.validate().map_err(invalid_input)?;
 
-    let current: i32 = connection.query_row(
+    let movement_type = if adjustment.quantity_delta > 0 {
+        MovementType::Restock
+    } else {
+        MovementType::Adjustment
+    };
+
+    apply_stock_change(
+        connection,
+        variant_id,
+        adjustment.quantity_delta,
+        &adjustment.note,
+        movement_type,
+        None,
+    )?;
+
+    get_variant(connection, variant_id)
+}
+
+pub fn record_merch_sale(connection: &Connection, sale: &MerchSale) -> SqlResult<MerchSaleResult> {
+    sale.validate().map_err(invalid_input)?;
+
+    let variant = get_variant(connection, sale.variant_id)?
+        .ok_or_else(|| invalid_input("variante introuvable"))?;
+    let product = get_product(connection, variant.product_id)?
+        .ok_or_else(|| invalid_input("produit introuvable"))?;
+
+    let unit_price = sale.unit_price.unwrap_or(variant.unit_price);
+    let total = unit_price * sale.quantity as f32;
+    let label = variant_label(&variant.attributes);
+    let transaction_name = format!("Vente merch — {} ({label})", product.product.name);
+
+    let new_transaction = NewTransaction {
+        name: transaction_name,
+        company: sale.company.clone(),
+        transaction_type: TransactionType::Income,
+        executed: sale.executed,
+        date: sale.date.clone(),
+        price_full_tax: total,
+        tag: "Merch".into(),
+        tax_amount: sale.tax_amount,
+        invoice_path: sale.invoice_path.clone(),
+    };
+
+    let tx = connection.unchecked_transaction()?;
+    let transaction_id = insert_transaction(&tx, &new_transaction)?;
+    apply_stock_change_tx(
+        &tx,
+        sale.variant_id,
+        -sale.quantity,
+        &sale.note,
+        MovementType::Sale,
+        Some(transaction_id),
+    )?;
+    tx.commit()?;
+
+    let transaction = get_transaction(connection, transaction_id)?
+        .ok_or_else(|| invalid_input("transaction introuvable"))?;
+    let variant = get_variant(connection, sale.variant_id)?
+        .ok_or_else(|| invalid_input("variante introuvable"))?;
+    let movement = get_latest_movement_for_variant(connection, sale.variant_id)?
+        .ok_or_else(|| invalid_input("mouvement introuvable"))?;
+
+    Ok(MerchSaleResult {
+        transaction,
+        variant,
+        movement,
+    })
+}
+
+pub fn list_stock_movements(
+    connection: &Connection,
+    filter: &StockMovementFilter,
+) -> SqlResult<Vec<StockMovementDetail>> {
+    let limit = filter.limit.unwrap_or(50).min(200) as i64;
+    let mut sql = String::from(
+        "SELECT m.id, m.variant_id, v.product_id, p.name, m.quantity_delta, m.note,
+                m.created_at, m.movement_type, m.transaction_id, v.sku
+         FROM stock_movements m
+         JOIN product_variants v ON v.id = m.variant_id
+         JOIN products p ON p.id = v.product_id
+         WHERE 1=1",
+    );
+
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    if let Some(variant_id) = filter.variant_id {
+        sql.push_str(" AND m.variant_id = ?");
+        params.push(Box::new(variant_id));
+    }
+    if let Some(product_id) = filter.product_id {
+        sql.push_str(" AND v.product_id = ?");
+        params.push(Box::new(product_id));
+    }
+    sql.push_str(" ORDER BY m.created_at DESC, m.id DESC LIMIT ?");
+    params.push(Box::new(limit));
+
+    let mut statement = connection.prepare(&sql)?;
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+    let mut rows = statement.query(param_refs.as_slice())?;
+    let mut movements = Vec::new();
+    while let Some(row) = rows.next()? {
+        let variant_id: i64 = row.get(1)?;
+        let attributes = list_attributes_for_variant(connection, variant_id)?;
+        movements.push(StockMovementDetail {
+            id: row.get(0)?,
+            variant_id,
+            product_id: row.get(2)?,
+            product_name: row.get(3)?,
+            variant_label: variant_label(&attributes),
+            sku: row.get(9)?,
+            quantity_delta: row.get(4)?,
+            note: row.get(5)?,
+            created_at: row.get(6)?,
+            movement_type: movement_type_from_str(&row.get::<_, String>(7)?),
+            transaction_id: row.get(8)?,
+        });
+    }
+    Ok(movements)
+}
+
+pub fn list_low_stock_alerts(
+    connection: &Connection,
+    filter: &LowStockFilter,
+) -> SqlResult<Vec<LowStockAlert>> {
+    let sql = if filter.threshold.is_some() {
+        "SELECT v.id, v.product_id, p.name, v.sku, v.stock_quantity, v.low_stock_threshold, v.unit_price
+         FROM product_variants v
+         JOIN products p ON p.id = v.product_id
+         WHERE v.stock_quantity <= ?1
+         ORDER BY v.stock_quantity ASC, p.name ASC"
+    } else {
+        "SELECT v.id, v.product_id, p.name, v.sku, v.stock_quantity, v.low_stock_threshold, v.unit_price
+         FROM product_variants v
+         JOIN products p ON p.id = v.product_id
+         WHERE v.stock_quantity <= v.low_stock_threshold
+         ORDER BY v.stock_quantity ASC, p.name ASC"
+    };
+
+    let mut statement = connection.prepare(sql)?;
+    let mut rows = if let Some(threshold) = filter.threshold {
+        statement.query([threshold])?
+    } else {
+        statement.query([])?
+    };
+    let mut alerts = Vec::new();
+    while let Some(row) = rows.next()? {
+        let variant_id: i64 = row.get(0)?;
+        let attributes = list_attributes_for_variant(connection, variant_id)?;
+        alerts.push(LowStockAlert {
+            variant_id,
+            product_id: row.get(1)?,
+            product_name: row.get(2)?,
+            variant_label: variant_label(&attributes),
+            sku: row.get(3)?,
+            stock_quantity: row.get(4)?,
+            threshold: row.get(5)?,
+            unit_price: row.get(6)?,
+        });
+    }
+    Ok(alerts)
+}
+
+fn apply_stock_change(
+    connection: &Connection,
+    variant_id: i64,
+    quantity_delta: i32,
+    note: &str,
+    movement_type: MovementType,
+    transaction_id: Option<i64>,
+) -> SqlResult<()> {
+    let tx = connection.unchecked_transaction()?;
+    apply_stock_change_tx(&tx, variant_id, quantity_delta, note, movement_type, transaction_id)?;
+    tx.commit()
+}
+
+fn apply_stock_change_tx(
+    tx: &rusqlite::Transaction<'_>,
+    variant_id: i64,
+    quantity_delta: i32,
+    note: &str,
+    movement_type: MovementType,
+    transaction_id: Option<i64>,
+) -> SqlResult<()> {
+    let current: i32 = tx.query_row(
         "SELECT stock_quantity FROM product_variants WHERE id = ?1",
         [variant_id],
         |row| row.get(0),
     )?;
-    let new_stock = current + adjustment.quantity_delta;
+    let new_stock = current + quantity_delta;
     if new_stock < 0 {
         return Err(invalid_input("stock insuffisant"));
     }
 
-    connection.execute(
+    tx.execute(
         "UPDATE product_variants SET stock_quantity = ?1 WHERE id = ?2",
         (new_stock, variant_id),
     )?;
 
-    connection.execute(
-        "INSERT INTO stock_movements (variant_id, quantity_delta, note, created_at)
-         VALUES (?1, ?2, ?3, datetime('now'))",
+    tx.execute(
+        "INSERT INTO stock_movements (variant_id, quantity_delta, note, created_at, movement_type, transaction_id)
+         VALUES (?1, ?2, ?3, datetime('now'), ?4, ?5)",
         (
             variant_id,
-            adjustment.quantity_delta,
-            adjustment.note.as_str(),
+            quantity_delta,
+            note,
+            movement_type_to_str(movement_type),
+            transaction_id,
         ),
     )?;
+    Ok(())
+}
 
-    get_variant(connection, variant_id)
+fn get_latest_movement_for_variant(
+    connection: &Connection,
+    variant_id: i64,
+) -> SqlResult<Option<StockMovement>> {
+    let mut statement = connection.prepare(
+        "SELECT id, variant_id, quantity_delta, note, created_at, movement_type, transaction_id
+         FROM stock_movements
+         WHERE variant_id = ?1
+         ORDER BY id DESC
+         LIMIT 1",
+    )?;
+    let mut rows = statement.query([variant_id])?;
+    if let Some(row) = rows.next()? {
+        Ok(Some(row_to_movement(row)?))
+    } else {
+        Ok(None)
+    }
+}
+
+fn row_to_movement(row: &rusqlite::Row<'_>) -> SqlResult<StockMovement> {
+    Ok(StockMovement {
+        id: row.get(0)?,
+        variant_id: row.get(1)?,
+        quantity_delta: row.get(2)?,
+        note: row.get(3)?,
+        created_at: row.get(4)?,
+        movement_type: movement_type_from_str(&row.get::<_, String>(5)?),
+        transaction_id: row.get(6)?,
+    })
+}
+
+fn movement_type_to_str(kind: MovementType) -> &'static str {
+    match kind {
+        MovementType::Sale => "SALE",
+        MovementType::Adjustment => "ADJUSTMENT",
+        MovementType::Restock => "RESTOCK",
+    }
+}
+
+fn movement_type_from_str(value: &str) -> MovementType {
+    match value {
+        "SALE" => MovementType::Sale,
+        "RESTOCK" => MovementType::Restock,
+        _ => MovementType::Adjustment,
+    }
 }
 
 pub fn get_variant(connection: &Connection, variant_id: i64) -> SqlResult<Option<ProductVariant>> {

@@ -98,6 +98,7 @@ pub const PREDEFINED_TAGS: &[&str] = &[
     "Prestation Musicale",
     "Transport",
     "Scénographie",
+    "Merch",
 ];
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]

@@ -8,8 +8,9 @@ use axum::{
     Json, Router,
 };
 use bandcompta_shared::{
-    paths, AdjustStock, ContactFilter, DateFilter, NewContact, NewProduct, NewProductVariant,
-    NewTag, NewTransaction, ProductDetail, ProductSummary, ProductVariant, Transaction,
+    paths, AdjustStock, ContactFilter, DateFilter, LowStockFilter, MerchSale, MerchSaleResult,
+    NewContact, NewProduct, NewProductVariant, NewTag, NewTransaction, ProductDetail,
+    ProductSummary, ProductVariant, StockMovementDetail, StockMovementFilter, Transaction,
     TreasurySummary, UploadResponse,
 };
 use rusqlite::Connection;
@@ -19,7 +20,7 @@ use crate::contacts::{get_contact, insert_contact, list_contacts};
 use crate::db::{get_transaction, insert_transaction, list_transactions, treasury_summary};
 use crate::inventory::{
     adjust_stock, get_product, get_product_kind, get_variant, insert_product, insert_variant,
-    list_products,
+    list_low_stock_alerts, list_products, list_stock_movements, record_merch_sale,
 };
 use crate::invoices::save_invoice;
 use crate::tags::{get_tag, insert_tag, list_tags};
@@ -44,6 +45,9 @@ pub fn app(connection: Connection) -> Router {
         .route(paths::PRODUCTS_BY_ID, get(get_product_handler))
         .route(paths::PRODUCT_VARIANTS, post(create_variant_handler))
         .route(paths::VARIANT_STOCK, patch(adjust_stock_handler))
+        .route(paths::STOCK_MOVEMENTS, get(list_movements_handler))
+        .route(paths::STOCK_ALERTS, get(list_alerts_handler))
+        .route(paths::MERCH_SALES, post(merch_sale_handler))
         .layer(cors)
         .with_state(Arc::new(Mutex::new(connection)))
 }
@@ -230,6 +234,34 @@ async fn adjust_stock_handler(
         .map_err(AppError::Database)?
         .ok_or(AppError::NotFound)?;
     Ok(Json(variant))
+}
+
+async fn list_movements_handler(
+    State(db): State<DbState>,
+    Query(filter): Query<StockMovementFilter>,
+) -> Result<Json<Vec<StockMovementDetail>>, AppError> {
+    let connection = db.lock().map_err(|_| AppError::Internal)?;
+    let movements = list_stock_movements(&connection, &filter).map_err(AppError::Database)?;
+    Ok(Json(movements))
+}
+
+async fn list_alerts_handler(
+    State(db): State<DbState>,
+    Query(filter): Query<LowStockFilter>,
+) -> Result<Json<Vec<bandcompta_shared::LowStockAlert>>, AppError> {
+    let connection = db.lock().map_err(|_| AppError::Internal)?;
+    let alerts = list_low_stock_alerts(&connection, &filter).map_err(AppError::Database)?;
+    Ok(Json(alerts))
+}
+
+async fn merch_sale_handler(
+    State(db): State<DbState>,
+    Json(body): Json<MerchSale>,
+) -> Result<(StatusCode, Json<MerchSaleResult>), AppError> {
+    body.validate().map_err(AppError::BadRequest)?;
+    let connection = db.lock().map_err(|_| AppError::Internal)?;
+    let result = record_merch_sale(&connection, &body).map_err(AppError::Database)?;
+    Ok((StatusCode::CREATED, Json(result)))
 }
 
 enum AppError {
